@@ -44,16 +44,17 @@ app.use(express.json())
 app.use(currentSession)
 
 const ipBlockList = []
-const limiter = rateLimit({
+const limiter = rateLimit({ // TODO set it up to work with trust proxy : true
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
 	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   // skip: (req, res) => ipBlockList.includes(req.ip)
 })
+
 // Set up ExpressAuth to handle authentication
 // IMPORTANT: It is highly encouraged set up rate limiting on this route
-app.use("/api/auth/*", limiter, ExpressAuthHandler)
+app.use("/api/auth/*",  ExpressAuthHandler)
 
 // Routes
 app.get("/protected", async (_req: Request, res: Response) => {
