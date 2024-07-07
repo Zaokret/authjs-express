@@ -12,7 +12,7 @@ import {
 } from "./middleware/auth.middleware.js"
 
 import { ExpressAuth } from "@auth/express"
-import { authConfig } from "./config/auth.config.js"
+import { ExpressAuthHandler } from "./config/auth.config.js"
 import * as pug from "pug"
 
 export const app = express()
@@ -44,7 +44,7 @@ app.use(currentSession)
 
 // Set up ExpressAuth to handle authentication
 // IMPORTANT: It is highly encouraged set up rate limiting on this route
-app.use("/api/auth/*", ExpressAuth(authConfig))
+app.use("/api/auth/*", ExpressAuthHandler)
 
 // Routes
 app.get("/protected", async (_req: Request, res: Response) => {
