@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <button type="button" id="login">Login</button>
+    <button type="button" id="user-info">Info</button>
+    <script>
+        document.getElementById('login').addEventListener('click', () => {
+            const loginURL = new URL('http://localhost:3000/api/auth/signin')
+            loginURL.searchParams.append('callbackUrl', window.location.href)
+            window.location.assign(loginURL)
+        })
+
+        document.getElementById('user-info').addEventListener('click', () => {
+            fetch('http://localhost:3000/api/protected', {credentials: 'include'})
+            .then(res => res.json())
+            .then(console.log)
+            .catch(console.error)
+        });
+    </script>
+</body>
+</html>

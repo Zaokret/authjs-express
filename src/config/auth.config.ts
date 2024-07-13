@@ -14,6 +14,7 @@ import { AuthConfig } from "@auth/core"
 import { decode, encode } from "@auth/core/jwt"
 import { randomUUID } from "crypto"
 import { ObjectId } from "mongodb"
+import Discord from "@auth/express/providers/discord"
 
 const mongoDbAdapter = MongoDBAdapter(clientPromise);
 
@@ -42,7 +43,9 @@ const credentialProvider = (req: Request, res: Response): CredentialsConfig[] =>
       email, 
       name: username, 
       password: generateHash(password),
-      image: avatar
+      image: avatar,
+      roles: ['user'],
+      origins: [new URL(decodeURIComponent(getCookie('authjs.callback-url', req))).origin]
     })
     if (!user) {
       res.status(500).json({statusText: 'Unable to create a new user'});
@@ -175,18 +178,77 @@ function setCookie(key: string, val: string, req: Request) {
 
 export const authConfig = (req: Request, res: Response): AuthConfig => {
 
+  if(reqIncludes(["callback"]) && req.method === "POST") {
+    console.log(
+      "Handling callback request from my Identity Provider",
+      {body: req.body, cookie: req.headers.cookie}
+    )
+  }
+
   function reqIncludes(arr: string[]) {
     return arr.some(str=>req.baseUrl.includes(str))
   }
 
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(url => new URL(url).origin) || [];
+
   return {
-  trustHost: true,
-  adapter: mongoDbAdapter,
-  providers: [...credentialProvider(req,res), GitHub],
-  session: {"strategy": "database"},
-  callbacks: 
-  {
+    // debug: true,
+    secret: process.env.AUTH_SECRET,
+    trustHost: true,
+    adapter: mongoDbAdapter,
+    providers: [...credentialProvider(req,res), Discord({
+      async profile(data) {
+        if (data.avatar === null) {
+          const defaultAvatarNumber =
+            data.discriminator === "0"
+              ? Number(BigInt(data.id) >> BigInt(22)) % 6
+              : parseInt(data.discriminator) % 5
+          data.image_url = `https://cdn.discordapp.com/embed/avatars/${defaultAvatarNumber}.png`
+        } else {
+          const format = data.avatar.startsWith("a_") ? "gif" : "png"
+          data.image_url = `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.${format}`
+        }
+        return {
+          id: data.id,
+          name: data.global_name ?? data.username,
+          email: data.email,
+          image: data.image_url,
+          roles: ['user'],
+          origins: [new URL(decodeURIComponent(getCookie('authjs.callback-url', req))).origin]
+        }
+      }
+    }), GitHub({
+    async profile(data) {
+      return {
+        id: data.id.toString(),
+        name: data.name ?? data.login,
+        email: data.email,
+        image: data.avatar_url,
+        roles: ['user'],
+        origins: [new URL(decodeURIComponent(getCookie('authjs.callback-url', req))).origin]
+      }
+    }
+  })
+],
+  session: {
+    strategy: "database", 
+    maxAge: 15 * 60 // 15 minutes
+    },
+  callbacks: {
+    async redirect({url, baseUrl}) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      const redirectOrigin = new URL(url).origin;
+      if ([baseUrl, ...allowedOrigins].some(u => u === redirectOrigin)) return url
+      return baseUrl;
+    },
     async signIn({ user, account, profile, credentials }): Promise<any> {
+      const callbackUrl = decodeURIComponent(getCookie('authjs.callback-url', req))
+      const origins = (user as any)['origins'];
+      if(origins.every((origin: string) => !callbackUrl.includes(origin))) {
+        res.clearCookie('authjs.callback-url')
+        return '/api/auth/signin' 
+      }
+
       if(reqIncludes(['login', 'register'])) {
         if(user.id) {
           const sessionToken = randomUUID()
@@ -232,16 +294,22 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
       return user;
     },
     async jwt({token,user}) {
+      if(token.exp && Date.now() > token.exp * 1000) {
+        // todo
+        console.log('token expired');
+      }
       if(user) token.user = user;
       return token;
     },
     async session({session, user}) {
+      // todo silent refresh??
       if(user) {
         session.user = {
           id: user.id,
           name: user.name,
           email: user.email,
           image: user.image,
+          roles: user.roles
         }
       }
       return session;

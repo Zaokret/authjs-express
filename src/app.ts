@@ -15,7 +15,8 @@ import { ExpressAuth } from "@auth/express"
 import { ExpressAuthHandler } from "./config/auth.config.js"
 import * as pug from "pug"
 import { rateLimit } from 'express-rate-limit'
-
+import cors from 'cors'
+import credentials from "@auth/express/providers/credentials"
 export const app = express()
 
 app.set("port", process.env.PORT || 3000)
@@ -28,6 +29,17 @@ app.set("view engine", "pug")
 // Trust Proxy for Proxies (Heroku, Render.com, Docker behind Nginx, etc)
 // https://stackoverflow.com/questions/40459511/in-express-js-req-protocol-is-not-picking-up-https-for-my-secure-link-it-alwa
 app.set("trust proxy", true)
+
+const origin = process.env.ALLOWED_ORIGINS?.split(',');
+console.log('Allowed origins: ', origin)
+
+const corsOptions = {
+  origin: origin,
+  credentials: true,
+  optionsSuccessStatus: 200 
+}
+
+app.use(cors(corsOptions))
 
 app.use(logger("dev"))
 
@@ -49,14 +61,13 @@ const limiter = rateLimit({ // TODO set it up to work with trust proxy : true
 	limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
 	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  // skip: (req, res) => ipBlockList.includes(req.ip)
+  limit: (req, res) => ipBlockList.includes(req.ip) ? 0 : 5
 })
 
 // Set up ExpressAuth to handle authentication
 // IMPORTANT: It is highly encouraged set up rate limiting on this route
 app.use("/api/auth/*",  ExpressAuthHandler)
 
-// Routes
 app.get("/protected", async (_req: Request, res: Response) => {
   res.render("protected", { session: res.locals.session })
 })

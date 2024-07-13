@@ -19,3 +19,4 @@ dist/**/*
 # Ignore built css files
 /public/css/output.css
 
+load-nvm

@@ -17,6 +17,8 @@ declare module "@auth/core/adapters" {
     email: string;
     emailVerified?: Date | null;
     password?: string;
+    roles?: string[];
+    origins?: string[];
   }
 
   // TODO

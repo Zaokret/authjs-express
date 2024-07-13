@@ -10,7 +10,6 @@ export async function authenticatedUser(
 ) {
   const session =
     res.locals.session ?? (await getSession(req, authConfig(req, res))) ?? undefined
-
   res.locals.session = session
 
   if (session) {
