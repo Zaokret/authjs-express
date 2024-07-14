@@ -192,7 +192,7 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
   const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(url => new URL(url).origin) || [];
 
   return {
-    // debug: true,
+    debug: true,
     secret: process.env.AUTH_SECRET,
     trustHost: true,
     adapter: mongoDbAdapter,
