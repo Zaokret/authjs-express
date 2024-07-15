@@ -15,6 +15,7 @@ import { decode, encode } from "@auth/core/jwt"
 import { randomUUID } from "crypto"
 import { ObjectId } from "mongodb"
 import Discord from "@auth/express/providers/discord"
+import { getCookie, setCookie } from "./cookie.js"
 
 const mongoDbAdapter = MongoDBAdapter(clientPromise);
 
@@ -150,31 +151,7 @@ const credentialProvider = (req: Request, res: Response): CredentialsConfig[] =>
 
 }
 
-function getCookie(search: string, req: Request) {
-  var cookie = req.headers.cookie;
-  if(!cookie) {
-    return {};
-  }
 
-  const dict = cookie.split('; ').reduce((obj, pair) => {
-    const [key,value] = pair.split('=')
-    obj[key] = value
-    return obj;
-  }, {} as any);
-
-  return dict[search]
-}
-
-function setCookie(key: string, val: string, req: Request) {
-  const dict = req.headers.cookie?.split(';').reduce((dict, pair)=> {
-    const [key, value] = pair.replace(' ','').split('=')
-    dict[key] = value;
-    return dict
-  }, {} as any)
-  dict[key] = val;
-
-  req.headers.cookie = Object.keys(dict).map(key => `${key}=${dict[key]}`).join('; ')
-}
 
 export const authConfig = (req: Request, res: Response): AuthConfig => {
 
@@ -218,6 +195,7 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
         }
       }
     }), GitHub({
+
     async profile(data) {
       return {
         id: data.id.toString(),
