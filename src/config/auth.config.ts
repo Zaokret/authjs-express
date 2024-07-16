@@ -213,19 +213,19 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
     maxAge: 15 * 60 // 15 minutes
     },
   callbacks: {
-    async redirect({url, baseUrl}) {
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      const redirectOrigin = new URL(url).origin;
-      if ([baseUrl, ...allowedOrigins].some(u => u === redirectOrigin)) return url
-      return baseUrl;
-    },
+    // async redirect({url, baseUrl}) {
+    //   if (url.startsWith("/")) return `${baseUrl}${url}`
+    //   const redirectOrigin = new URL(url).origin;
+    //   if ([baseUrl, ...allowedOrigins].some(u => u === redirectOrigin)) return url
+    //   return baseUrl;
+    // },
     async signIn({ user, account, profile, credentials }): Promise<any> {
-      const callbackUrl = decodeURIComponent(getCookie('authjs.callback-url', req))
-      const origins = (user as any)['origins'];
-      if(origins.every((origin: string) => !callbackUrl.includes(origin))) {
-        res.clearCookie('authjs.callback-url')
-        return '/api/auth/signin' 
-      }
+      // const callbackUrl = decodeURIComponent(getCookie('authjs.callback-url', req))
+      // const origins = (user as any)['origins'];
+      // if(origins.every((origin: string) => !callbackUrl.includes(origin))) {
+      //   res.clearCookie('authjs.callback-url')
+      //   return '/api/auth/signin' 
+      // }
 
       if(reqIncludes(['login', 'register'])) {
         if(user.id) {
