@@ -36,6 +36,10 @@ async function findAccount({id, provider, type}: any) {
     .findOne(query)
 }
 
+function getCallbackUrlOrigin(req: Request) {
+    return new URL(decodeURIComponent(getCookie('__Secure-authjs.callback-url', req))).origin;
+}
+
 const credentialProvider = (req: Request, res: Response): CredentialsConfig[] => 
 {
   async function createNewUser({email, password, username}: any) {
@@ -46,7 +50,7 @@ const credentialProvider = (req: Request, res: Response): CredentialsConfig[] =>
       password: generateHash(password),
       image: avatar,
       roles: ['user'],
-      origins: [new URL(decodeURIComponent(getCookie('authjs.callback-url', req))).origin]
+      origins: [getCallbackUrlOrigin(req)]
     })
     if (!user) {
       res.status(500).json({statusText: 'Unable to create a new user'});
@@ -173,7 +177,8 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
     secret: process.env.AUTH_SECRET,
     trustHost: true,
     adapter: mongoDbAdapter,
-    providers: [...credentialProvider(req,res), Discord({
+    providers: [...credentialProvider(req,res), 
+      Discord({
       async profile(data) {
         if (data.avatar === null) {
           const defaultAvatarNumber =
@@ -191,10 +196,11 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
           email: data.email,
           image: data.image_url,
           roles: ['user'],
-          origins: [new URL(decodeURIComponent(getCookie('authjs.callback-url', req))).origin]
+          origins: [getCallbackUrlOrigin(req)]
         }
       }
-    }), GitHub({
+    }), 
+      GitHub({
 
     async profile(data) {
       return {
@@ -203,10 +209,10 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
         email: data.email,
         image: data.avatar_url,
         roles: ['user'],
-        origins: [new URL(decodeURIComponent(getCookie('authjs.callback-url', req))).origin]
+        origins: [getCallbackUrlOrigin(req)]
       }
     }
-  })
+    })
 ],
   session: {
     strategy: "database", 
