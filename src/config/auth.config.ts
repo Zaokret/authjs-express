@@ -15,7 +15,8 @@ import { decode, encode } from "@auth/core/jwt"
 import { randomUUID } from "crypto"
 import { ObjectId } from "mongodb"
 import Discord from "@auth/express/providers/discord"
-import { getCookie, setCookie } from "./cookie.js"
+import { getCookie, getCookieName, setCookie } from "./cookie.js"
+import { isProd, loadEnvArrVal } from "./env-loader.js"
 
 const mongoDbAdapter = MongoDBAdapter(clientPromise);
 
@@ -37,7 +38,10 @@ async function findAccount({id, provider, type}: any) {
 }
 
 function getCallbackUrlOrigin(req: Request) {
-    return new URL(decodeURIComponent(getCookie('__Secure-authjs.callback-url', req))).origin;
+  const cookieName = getCookieName('callback-url');
+  const urlEncoded = getCookie(cookieName, req);
+  const urlDecoded = decodeURIComponent(urlEncoded);
+  return new URL(urlDecoded).origin;
 }
 
 const credentialProvider = (req: Request, res: Response): CredentialsConfig[] => 
@@ -151,14 +155,9 @@ const credentialProvider = (req: Request, res: Response): CredentialsConfig[] =>
       }
       return null;
     },
-})];
-
-}
-
-
+})]}
 
 export const authConfig = (req: Request, res: Response): AuthConfig => {
-
   if(reqIncludes(["callback"]) && req.method === "POST") {
     console.log(
       "Handling callback request from my Identity Provider",
@@ -170,7 +169,7 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
     return arr.some(str=>req.baseUrl.includes(str))
   }
 
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(url => new URL(url).origin) || [];
+  const allowedOrigins = loadEnvArrVal('ALLOWED_ORIGINS').map(url => new URL(url).origin);
 
   return {
     debug: true,
@@ -219,12 +218,17 @@ export const authConfig = (req: Request, res: Response): AuthConfig => {
     maxAge: 15 * 60 // 15 minutes
     },
   callbacks: {
-    // async redirect({url, baseUrl}) {
-    //   if (url.startsWith("/")) return `${baseUrl}${url}`
-    //   const redirectOrigin = new URL(url).origin;
-    //   if ([baseUrl, ...allowedOrigins].some(u => u === redirectOrigin)) return url
-    //   return baseUrl;
-    // },
+    async redirect({url, baseUrl}) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      const redirectOrigin = new URL(url).origin;
+
+      if(isProd()) {
+        if ([baseUrl, ...allowedOrigins].some(u => u === redirectOrigin)) return url
+        return baseUrl;
+      }
+
+      return url;
+    },
     async signIn({ user, account, profile, credentials }): Promise<any> {
       // const callbackUrl = decodeURIComponent(getCookie('authjs.callback-url', req))
       // const origins = (user as any)['origins'];

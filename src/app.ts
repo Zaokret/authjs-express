@@ -17,9 +17,12 @@ import * as pug from "pug"
 import { rateLimit } from 'express-rate-limit'
 import cors from 'cors'
 import credentials from "@auth/express/providers/credentials"
-export const app = express()
+import { loadEnvArrVal } from "./config/env-loader.js"
 
-app.set("port", process.env.PORT || 3000)
+const port = process.env.PORT || 3000;
+
+export const app = express()
+app.set("port", port)
 
 // @ts-expect-error (https://stackoverflow.com/questions/45342307/error-cannot-find-module-pug)
 app.engine("pug", pug.__express)
@@ -30,7 +33,7 @@ app.set("view engine", "pug")
 // https://stackoverflow.com/questions/40459511/in-express-js-req-protocol-is-not-picking-up-https-for-my-secure-link-it-alwa
 app.set("trust proxy", true)
 
-const origin = process.env.ALLOWED_ORIGINS?.split(',');
+const origin = loadEnvArrVal('ALLOWED_ORIGINS')
 console.log('Allowed origins: ', origin)
 
 const corsOptions = {
@@ -55,13 +58,15 @@ app.use(express.json())
 // Set session in res.locals
 app.use(currentSession)
 
-const ipBlockList = []
+const ipBlockList = loadEnvArrVal('IP_BLOCK_LIST');
+const ipAllowList = loadEnvArrVal('IP_ALLOW_LIST');
 const limiter = rateLimit({ // TODO set it up to work with trust proxy : true
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
 	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  limit: (req, res) => ipBlockList.includes(req.ip) ? 0 : 5
+  limit: (req, res) => ipBlockList.includes(req.ip) ? 0 : 5, // completelly limit requests coming from blocked IPs
+  skip: (req, res) => ipAllowList.includes(req.ip) // disable limiter for allowed IPs
 })
 
 // Set up ExpressAuth to handle authentication

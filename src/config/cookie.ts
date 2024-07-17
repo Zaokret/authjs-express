@@ -1,4 +1,5 @@
 import { Request } from "express"
+import { isProd } from "./env-loader.js";
 
 export function getCookie(search: string, req: Request) {
     var cookie = req.headers.cookie;
@@ -26,7 +27,21 @@ export function setCookie(newKey: string, val: string, req: Request) {
     req.headers.cookie = Object.keys(dict).map(key => `${key}=${dict[key]}`).join('; ')
 }
 
-/*
-__Host-authjs.csrf-token
-__Secure-authjs.callback-url
-*/
+export type CookieKeys = 'callback-url' | 'csrf-token';
+
+export function getCookieName(key: CookieKeys) {
+    const prefixBase = 'authjs.'
+    const cookies = {
+        'callback-url': {
+            dev: prefixBase,
+            prod: '__Secure-' + prefixBase
+        },
+        'csrf-token': {
+            dev: prefixBase,
+            prod: '__Host-' + prefixBase
+        }
+    }
+
+    const prefix = isProd() ? cookies[key].prod : cookies[key].dev;
+    return prefix + key;
+}
