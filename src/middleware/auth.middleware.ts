@@ -3,6 +3,24 @@ import { getSession } from "@auth/express"
 import { authConfig } from "../config/auth.config.js"
 import type { NextFunction, Request, Response } from "express"
 
+export function userWithRoleGuard(role: string) {
+  return async function(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) {
+    const session =
+    res.locals.session ?? (await getSession(req, authConfig(req, res))) ?? undefined
+    res.locals.session = session
+
+  if(session && session.user.roles.includes(role)) {
+    return next();
+  }
+
+  return res.status(401).json({ message: "Permission denied" });
+  }
+}
+
 export async function authenticatedUser(
   req: Request,
   res: Response,
@@ -11,7 +29,7 @@ export async function authenticatedUser(
   const session =
     res.locals.session ?? (await getSession(req, authConfig(req, res))) ?? undefined
   res.locals.session = session
-
+  
   if (session) {
     return next()
   }

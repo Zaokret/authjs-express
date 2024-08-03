@@ -1,4 +1,3 @@
-// @ts-nocheck
 import express, { type Request, type Response } from "express"
 import logger from "morgan"
 import * as path from "node:path"
@@ -9,15 +8,16 @@ import {
 import {
   authenticatedUser,
   currentSession,
+  userWithRoleGuard,
 } from "./middleware/auth.middleware.js"
 
-import { ExpressAuth } from "@auth/express"
 import { ExpressAuthHandler } from "./config/auth.config.js"
 import * as pug from "pug"
-import { rateLimit } from 'express-rate-limit'
+// import { rateLimit } from 'express-rate-limit'
 import cors from 'cors'
-import credentials from "@auth/express/providers/credentials"
 import { loadEnvArrVal } from "./config/env-loader.js"
+import clientPromise from "./db.js"
+import { ObjectId } from "mongodb"
 
 const port = process.env.PORT || 3000;
 
@@ -58,16 +58,17 @@ app.use(express.json())
 // Set session in res.locals
 app.use(currentSession)
 
-const ipBlockList = loadEnvArrVal('IP_BLOCK_LIST');
-const ipAllowList = loadEnvArrVal('IP_ALLOW_LIST');
-const limiter = rateLimit({ // TODO set it up to work with trust proxy : true
-	windowMs: 15 * 60 * 1000, // 15 minutes
-	limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  limit: (req, res) => ipBlockList.includes(req.ip) ? 0 : 5, // completelly limit requests coming from blocked IPs
-  skip: (req, res) => ipAllowList.includes(req.ip) // disable limiter for allowed IPs
-})
+// const ipBlockList = loadEnvArrVal('IP_BLOCK_LIST');
+// const ipAllowList = loadEnvArrVal('IP_ALLOW_LIST');
+
+// const limiter = rateLimit({ // TODO set it up to work with trust proxy : true
+// 	windowMs: 15 * 60 * 1000, // 15 minutes
+// 	limit: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+// 	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+// 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+//   limit: (req, res) => ipBlockList.includes(req.ip) ? 0 : 5, // completelly limit requests coming from blocked IPs
+//   skip: (req, res) => ipAllowList.includes(req.ip) // disable limiter for allowed IPs
+// })
 
 // Set up ExpressAuth to handle authentication
 // IMPORTANT: It is highly encouraged set up rate limiting on this route
@@ -82,6 +83,28 @@ app.get(
   authenticatedUser,
   async (_req: Request, res: Response) => {
     res.json(res.locals.session)
+  },
+)
+
+async function updateRoles({userId, roles}: any) {
+  const client = await clientPromise;
+  const db = client.db();
+  const query = {"_id": new ObjectId(userId)};
+  return await db.collection('users').findOneAndUpdate(
+    query, 
+    { $set: { roles } }, 
+    { returnDocument: 'after' }
+  );
+}
+
+// available roles: "user", "agent", "creator", "agent manager", "creator manager", "admin"
+app.post(
+  "/api/protected/user/:userId/roles",
+  userWithRoleGuard('admin'),
+  async (_req: Request, res: Response) => {
+    const user = await updateRoles({ userId: _req.params.userId, roles: _req.body })
+    const { origins, ...rest } = user!;
+    res.json(rest)
   },
 )
 
